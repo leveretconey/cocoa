@@ -13,8 +13,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import leveretconey.cocoa.multipleStandard.ClassSquareSumOverAttriCount;
 import leveretconey.cocoa.multipleStandard.DFSDiscovererWithMultipleStandard;
 import leveretconey.cocoa.multipleStandard.DFSDiscovererWithMultipleStandard.ValidatorType;
+import leveretconey.cocoa.multipleStandard.LODRankingFunction;
 import leveretconey.cocoa.twoSideExpand.BruteForceALODValidatorUsingSP;
 import leveretconey.cocoa.twoSideExpand.DFSDiscovererG1;
 import leveretconey.cocoa.twoSideExpand.DFSDiscovererG3;
@@ -55,7 +57,7 @@ public class Tests {
     public static final boolean useData=true;
     public static final boolean useRawData=false;
     public static final boolean useDependency=false;
-    public static final boolean forgeData=true;
+    public static final boolean forgeData=false;
     public static final int logLevel= Gateway.LogGateway.DEBUG;
     public static final boolean hasTimeLimit=false;
     private static final StringBuilder debugInfo=new StringBuilder();
@@ -313,12 +315,16 @@ public class Tests {
 
     }
 
+    @Test
     void testOrder(){
         ALODDiscoverer discoverer=new DFSDiscovererWithMultipleStandard(ValidatorType.G1,0.02);
-        Collection<LexicographicalOrderDependency> result = discoverer.discover(data, 0.02);
-        for (LexicographicalOrderDependency od : result) {
-            Util.out(od);
-        }
+        Collection<LexicographicalOrderDependency> result;
+//        result = discoverer.discover(data, 0.02);
+//        printStatistics();
+//        resetStatistics();
+//        for (LexicographicalOrderDependency od : result) {
+//            Util.out(od);
+//        }
 
         discoverer=new ORDERAP();
         result = discoverer.discover(data, 0.02);
@@ -340,34 +346,30 @@ public class Tests {
     }
 
     void testALODPath(){
-        String odString="2<=,3<=,5<=,9<=,12<=,8<=->1<=,4<=,6<=,7<=,10>=,11<=";
+        String odString="4<=,6<=->3<=,5<=";
         LexicographicalOrderDependency odPrototype=LexicographicalOrderDependency.fromString(odString);
-        LexicographicalOrderDependency dependency=new LexicographicalOrderDependency();
+        LexicographicalOrderDependency od=new LexicographicalOrderDependency();
+        LODRankingFunction rankingFunction=new ClassSquareSumOverAttriCount();
 
-        dependency.right.add(odPrototype.right.get(0));
-        dependency.left.add(odPrototype.left.get(0));
-        ImprovedTwoSideSortedPartition parent=new ImprovedTwoSideSortedPartition(data,dependency);
+        od.right.add(odPrototype.right.get(0));
+        od.left.add(odPrototype.left.get(0));
+        ImprovedTwoSideSortedPartition parent=new ImprovedTwoSideSortedPartition(data,od);
 
         while (true){
-            Statistics.printStstistics();
-            ImprovedTwoSideSortedPartition fullISP=new ImprovedTwoSideSortedPartition(data,dependency);
-            ValidationResultWithAccurateBound fullState = fullISP.validateForALODWithG1();
-            ValidationResultWithAccurateBound fullStateG3 = fullISP.validateForALODWithG3();
-            ValidationResultWithAccurateBound parentState = parent.validateForALODWithG1();
-
-            Util.out(String.format("g1 : %s, g1 new : %s, g3 : %s, %s",fullState,parentState,fullStateG3,dependency));
-            if (dependency.length() >= odPrototype.length()) {
+            ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition(data,od);
+            ValidationResultWithAccurateBound er = isp.validateForALODWithG1();
+            Util.out(String.format("%s (%s): %.4f",od,er,rankingFunction.getRanking(od,isp)));
+            if (od.length() >= odPrototype.length()) {
                 break;
             }
-            if (fullState.isValid(errorRateThreshold) && fullISP.validateForALODWithG3().isValid(errorRateThreshold)) {
-                parent=parent.deepCloneAndIntersect(data,odPrototype.right.get(dependency.right.size()),false);
-                dependency.right.add(odPrototype.right.get(dependency.right.size()));
+            if (er.isValid(errorRateThreshold)) {
+                parent=parent.deepCloneAndIntersect(data,odPrototype.right.get(od.right.size()),false);
+                od.right.add(odPrototype.right.get(od.right.size()));
             } else {
-                parent=parent.deepCloneAndIntersect(data,odPrototype.left.get(dependency.left.size()),true);
-                dependency.left.add(odPrototype.left.get(dependency.left.size()));
+                parent=parent.deepCloneAndIntersect(data,odPrototype.left.get(od.left.size()),true);
+                od.left.add(odPrototype.left.get(od.left.size()));
             }
         }
-        TimeStatistics.printStatistics();
     }
 
     void testSomeODs(){
@@ -515,8 +517,17 @@ public class Tests {
         Statistics.printStstistics();
     }
 
+    void testRankingFunction(){
+        DFSDiscovererWithMultipleStandard discoverer = new DFSDiscovererWithMultipleStandard(ValidatorType.G1, 0.02);
+        Collection<LexicographicalOrderDependency> ods = discoverer.discover(data, 0.02);
+        LODRankingFunction rankingFunction=new ClassSquareSumOverAttriCount();
+        for (LexicographicalOrderDependency od : ods) {
+            ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition(data,od);
+            double ranking=rankingFunction.getRanking(od,isp);
+            Util.out(String.format("%s的ranking是%.4f",od,ranking));
+        }
+    }
 
-    @Test
     void testFastOD(){
         FasTOD fasTOD=new FasTOD(10*60*60*1000,0.01);
         List<CanonicalOD> ods = fasTOD.discover(data);

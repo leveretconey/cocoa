@@ -24,6 +24,7 @@ import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
 import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicateList;
 import leveretconey.dependencyDiscover.SPCache.SortedPartitionCache;
 import leveretconey.dependencyDiscover.SortedPartition.ImprovedTwoSideSortedPartition;
+import leveretconey.dependencyDiscover.Validator.Result.ValidationResultWithAccurateBound;
 import leveretconey.util.Gateway;
 import leveretconey.util.Timer;
 import leveretconey.util.Util;
@@ -34,7 +35,6 @@ public class ORDERAP extends ALODDiscoverer {
 
     private ValidatorType type= ValidatorType.G1;
     private DataFrame data;
-    LODMinimalityChecker minimalityChecker;
     Timer timer;
     @Override
     public Collection<LexicographicalOrderDependency> discover(DataFrame data, double errorRateThreshold) {
@@ -43,6 +43,7 @@ public class ORDERAP extends ALODDiscoverer {
         SortedPartitionCache spCache=new ORDERSortedPartitionCache(data);
         LinkedList<LexicographicalOrderDependency> queue=new LinkedList<>();
 
+        int dequeCount=0;
         for (int lhs = 1; lhs <= data.getColumnCount(); lhs++) {
             for (int rhs = 1; rhs <= data.getColumnCount(); rhs++) {
                 if (lhs==rhs){
@@ -53,51 +54,45 @@ public class ORDERAP extends ALODDiscoverer {
             }
         }
 
-        minimalityChecker=new ALODMinimalityCheckerUseFD();
         timer=new Timer();
         Gateway traversalGateway=new Gateway.ComplexTimeGateway();
         while (!queue.isEmpty()){
+            dequeCount++;
             LexicographicalOrderDependency parent = queue.pollFirst();
             ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition
                     (spCache.get(parent.left),spCache.get(parent.right));
-            double errorRate;
+            ValidationResultWithAccurateBound validationResult;
             if (type==ValidatorType.G1){
-                errorRate=isp.validateForALODWithG1().errorRate;
+                validationResult=isp.validateForALODWithG1();
             }else {
-                errorRate=isp.validateForALODWithG3().errorRate;
+                validationResult=isp.validateForALODWithG3();
             }
             if (Gateway.LogGateway.isOpen(Gateway.LogGateway.DEBUG) && traversalGateway.isOpen()) {
-                Util.out(String.format("当前时间%.3f,扩展到:%s,发现od %d个"
-                        , timer.getTimeUsedInSecond(), parent, result.size()));
+                Util.out(String.format("当前时间%.3f,扩展到:%s,发现od %d个,处理节点%d个"
+                        , timer.getTimeUsedInSecond(), parent, result.size(),dequeCount));
             }
-//            if (parent.left.get(0)==parent.right.get(0)){
-//                int x=1;
-//            }
-            if (errorRate>errorRateThreshold){
-                for (SingleAttributePredicate expandPredicate : getExpandPredicates(parent.left,parent.right)) {
-                    SingleAttributePredicateList expandList=parent.left.deepCloneAndAdd(expandPredicate);
-                    if (!minimalityChecker.isMinimal(expandList)){
-                        continue;
-                    }
-                    if (spCache.get(expandList).equalsFast(spCache.get(parent.left))){
-                        continue;
-                    }
-                    queue.addLast(new LexicographicalOrderDependency(expandList,parent.right));
-                }
-            }else {
+            if (validationResult.isValid(errorRateThreshold)) {
                 result.add(parent);
-                for (SingleAttributePredicate expandPredicate : getExpandPredicates(parent.right,parent.left)) {
-                    SingleAttributePredicateList expandList=parent.right.deepCloneAndAdd(expandPredicate);
-                    if (!minimalityChecker.isMinimal(expandList)){
-                        continue;
+                if (!validationResult.upperBoundLessThan(errorRateThreshold)){
+                    for (SingleAttributePredicate expandPredicate : getExpandPredicates(parent.right,parent.left)) {
+                        SingleAttributePredicateList expandList = parent.right.deepCloneAndAdd(expandPredicate);
+                        if (spCache.get(expandList).equalsFast(spCache.get(parent.right))) {
+                            continue;
+                        }
+                        queue.addLast(new LexicographicalOrderDependency(parent.left, expandList));
                     }
-                    if (spCache.get(expandList).equalsFast(spCache.get(parent.right))){
-                        continue;
+                }
+            } else {
+                if (!validationResult.lowerBoundGreaterThan(errorRateThreshold)){
+                    for (SingleAttributePredicate expandPredicate : getExpandPredicates(parent.left,parent.right)) {
+                        SingleAttributePredicateList expandList = parent.left.deepCloneAndAdd(expandPredicate);
+                        if (spCache.get(expandList).equalsFast(spCache.get(parent.left))) {
+                            continue;
+                        }
+                        queue.addLast(new LexicographicalOrderDependency(expandList, parent.right));
                     }
-                    queue.addLast(new LexicographicalOrderDependency(parent.left,expandList));
                 }
             }
-
         }
         Util.out(String.format("运行结束，用时%.3fs,发现od %d个"
                 , timer.getTimeUsedInSecond(), result.size()));

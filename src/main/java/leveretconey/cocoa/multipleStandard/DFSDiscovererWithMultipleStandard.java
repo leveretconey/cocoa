@@ -98,16 +98,6 @@ public class DFSDiscovererWithMultipleStandard extends ALODDiscoverer {
         if (Gateway.LogGateway.isOpen(Gateway.LogGateway.INFO)) {
             Util.out(String.format("运行结束，用时%.3fs,发现od %d个"
             , timer.getTimeUsedInSecond(), odCount));
-
-//            int count=tree.getNodeCount(node -> {
-//                if(node.states[0] instanceof ValidationResultWithAccurateBound
-//                 && node.states[1] instanceof ValidationResultWithAccurateBound){
-//                    return ((ValidationResultWithAccurateBound)node.states[0]).errorRate
-//                            >((ValidationResultWithAccurateBound)node.states[1]).errorRate;
-//                }
-//                return false;
-//            });
-//            Util.out("g1比g3大的节点数量为"+count);
         }
 
         return result;
