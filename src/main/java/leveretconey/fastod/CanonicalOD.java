@@ -3,12 +3,14 @@ package leveretconey.fastod;
 import java.util.Objects;
 
 import leveretconey.dependencyDiscover.Data.DataFrame;
+import leveretconey.dependencyDiscover.Predicate.Operator;
+import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
 
 public class CanonicalOD implements Comparable<CanonicalOD>{
 
     public AttributeSet context;
     public int right;
-    public int left;
+    public SingleAttributePredicate left;
     public static int splitCheckCount=0;
     public static int swapCheckCount=0;
 
@@ -20,13 +22,23 @@ public class CanonicalOD implements Comparable<CanonicalOD>{
         int contextValueDiff=context.getValue()-o.context.getValue();
         if(contextValueDiff!=0)
             return contextValueDiff;
-        int leftDiff=left-o.left;
-        if(leftDiff!=0)
-            return leftDiff;
-        return right-o.right;
+        int rightDiff=right-o.right;
+        if (rightDiff!=0)
+            return rightDiff;
+        if (left!=null) {
+            int leftDiff = left.attribute - o.left.attribute;
+            if (leftDiff != 0)
+                return leftDiff;
+            if (left.operator == o.left.operator)
+                return 0;
+            if (left.operator == Operator.lessEqual)
+                return -1;
+        }
+        return 0;
+
     }
 
-    public CanonicalOD(AttributeSet context, int left, int right) {
+    public CanonicalOD(AttributeSet context, SingleAttributePredicate left, int right) {
         this.context = context;
         this.right = right;
         this.left = left;
@@ -35,26 +47,26 @@ public class CanonicalOD implements Comparable<CanonicalOD>{
     public CanonicalOD(AttributeSet context, int right) {
         this.context = context;
         this.right = right;
-        this.left=-1;
+        this.left=null;
     }
 
     @Override
     public String toString() {
         StringBuilder sb=new StringBuilder();
         sb.append(context).append(" : ");
-        if(left==-1){
+        if(left==null){
             sb.append("[] -> ");
         }else {
-            sb.append(left+1).append(" ~ ");
+            sb.append(left).append(" ~ ");
         }
-        sb.append(right+1);
+        sb.append(right+1).append("<=");
         return sb.toString();
     }
 
     public boolean isValid(DataFrame data, double errorRateThreshold){
-        StrippedPartition sp=StrippedPartition.getStrippedPartition(context,data);
+        StrippedPartition sp= StrippedPartition.getStrippedPartition(context,data);
         if (errorRateThreshold==-1f){
-            if(left==-1){
+            if(left==null){
                 splitCheckCount++;
                 return !sp.split(right);
             }
@@ -64,7 +76,7 @@ public class CanonicalOD implements Comparable<CanonicalOD>{
             }
         }else {
             long vioCount;
-            if (left == -1) {
+            if (left == null) {
                 vioCount = sp.splitRemoveCount(right);
             } else {
                 vioCount = sp.swapRemoveCount(left,right);
@@ -89,14 +101,4 @@ public class CanonicalOD implements Comparable<CanonicalOD>{
         return Objects.hash(context, right, left);
     }
 
-    public static CanonicalOD makeCanonicalODBeginFromOne(AttributeSet context, int right){
-        return makeCanonicalODBeginFromOne(context,0, right);
-    }
-    public static CanonicalOD makeCanonicalODBeginFromOne(AttributeSet context, int left, int right){
-        AttributeSet set=new AttributeSet();
-        for(int attribute:context){
-            set=set.addAttribute(attribute-1);
-        }
-        return new CanonicalOD(set,left-1,right-1);
-    }
 }

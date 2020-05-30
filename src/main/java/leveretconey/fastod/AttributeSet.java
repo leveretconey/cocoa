@@ -104,6 +104,7 @@ public class AttributeSet implements Iterable<Integer>{
     }
     @Override
     public boolean equals(Object o) {
+        if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         AttributeSet that = (AttributeSet) o;
         return value == that.value;
@@ -137,15 +138,9 @@ public class AttributeSet implements Iterable<Integer>{
         return new AttributeSet( value & ( ~0 ^ as2.value));
     }
 
+
     public boolean isEmpty(){
         return value==0;
     }
 
-    public boolean subsetOf(AttributeSet as2){
-        return (value | as2.value) == as2.value;
-    }
-
-    public boolean superSet(AttributeSet as2){
-        return (value | as2.value) == value;
-    }
 }

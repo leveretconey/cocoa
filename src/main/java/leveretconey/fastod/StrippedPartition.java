@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 
 import leveretconey.dependencyDiscover.Data.DataFrame;
+import leveretconey.dependencyDiscover.Predicate.Operator;
+import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
 import leveretconey.util.Timer;
 
 public class StrippedPartition {
@@ -105,7 +107,7 @@ public class StrippedPartition {
         return false;
     }
 
-    public boolean swap(int left, int right){
+    public boolean swap(SingleAttributePredicate left, int right){
         Timer timer=new Timer();
         for(int beginPointer=0;beginPointer<begins.size()-1;beginPointer++) {
             int groupBegin = begins.get(beginPointer);
@@ -114,7 +116,7 @@ public class StrippedPartition {
             List<DataAndIndex> values=new ArrayList<>();
             for(int i=groupBegin;i<groupEnd;i++) {
                 int index = indexes.get(i);
-                values.add(new DataAndIndex(data.get(index,left),data.get(index,right)));
+                values.add(new DataAndIndex(filteredDataFrameGet(data,index,left),data.get(index,right)));
             }
             Collections.sort(values);
             int beforeMax=Integer.MIN_VALUE;
@@ -199,7 +201,7 @@ public class StrippedPartition {
         return result;
     }
 
-    public long swapRemoveCount(int left, int right){
+    public long swapRemoveCount(SingleAttributePredicate left, int right){
         int length=indexes.size();
         int[] vioCount=new int[length];
         boolean[] deleted=new boolean[length];
@@ -209,10 +211,10 @@ public class StrippedPartition {
             int groupBegin = begins.get(beginPointer);
             int groupEnd = begins.get(beginPointer + 1);
             for (int i = groupBegin ; i < groupEnd; i++) {
-                int lefti=data.get(indexes.get(i),left);
+                int lefti=filteredDataFrameGet(data,indexes.get(i),left);
                 int righti=data.get(indexes.get(i),right);
                 for (int j = i+1 ; j < groupEnd; j++) {
-                    int diffLeft=lefti-data.get(indexes.get(j),left);
+                    int diffLeft=lefti-filteredDataFrameGet(data,indexes.get(j),left);
                     int diffRight=righti-data.get(indexes.get(j),right);
                     if (diffLeft!=0 && diffRight!=0 && (diffLeft>0 != diffRight>0)){
                         vioCount[i]++;
@@ -232,16 +234,24 @@ public class StrippedPartition {
                 }
                 result++;
                 deleted[deleteIndex]=true;
-                int leftj=data.get(indexes.get(deleteIndex),left);
+                int leftj=filteredDataFrameGet(data,indexes.get(deleteIndex),left);
                 int rightj=data.get(indexes.get(deleteIndex),right);
                 for (int i = groupBegin ; i < groupEnd; i++) {
-                    int diffLeft=leftj-data.get(indexes.get(i),left);
+                    int diffLeft=leftj-filteredDataFrameGet(data,indexes.get(i),left);
                     int diffRight=rightj-data.get(indexes.get(i),right);
                     if (diffLeft!=0 && diffRight!=0 && (diffLeft>0 != diffRight>0)){
                         vioCount[i]--;
                     }
                 }
             }
+        }
+        return result;
+    }
+
+    private int filteredDataFrameGet(DataFrame data,int tuple,SingleAttributePredicate column){
+        int result=data.get(tuple,column.attribute);
+        if (column.operator== Operator.greaterEqual){
+            result=-result;
         }
         return result;
     }

@@ -1,35 +1,39 @@
 package leveretconey.fastod;
 
 import java.security.InvalidParameterException;
+import java.util.Objects;
+
+import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
 
 public class AttributePair {
-    public final int attribute1;
-    public final int attribute2;
+    public final SingleAttributePredicate left;
+    public final int right;
 
-    public AttributePair(int attribute1, int attribute2) {
-        if(attribute1==attribute2){
+    public AttributePair(SingleAttributePredicate left, int right) {
+        if(left.attribute==right){
             throw new InvalidParameterException("two attributes cannot be the same");
         }
-        this.attribute1 = Math.min(attribute1,attribute2);
-        this.attribute2 = Math.max(attribute1,attribute2);
+        this.left = left;
+        this.right = right;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof AttributePair)) return false;
         AttributePair that = (AttributePair) o;
-        return attribute1 == that.attribute1 &&
-                attribute2 == that.attribute2;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("{%d,%d}",attribute1+1,attribute2+1);
+        return right == that.right && left==that.left;
     }
 
     @Override
     public int hashCode() {
-        return 1<<attribute1 | 1<<attribute2;
+        return Objects.hash(left, right);
     }
+
+    @Override
+    public String toString() {
+        return String.format("{%s,%d}", left, right +1);
+    }
+
+
 }

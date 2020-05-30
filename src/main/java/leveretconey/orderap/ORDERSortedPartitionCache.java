@@ -60,9 +60,13 @@ public class ORDERSortedPartitionCache implements SortedPartitionCache {
         }
         SortedPartition sp=null;
         SingleAttributePredicateList oneLess = list.deepCloneAndRemoveLast();
-        if (lruCache.containsKey(oneLess)){
+        if (oneLess.size()==1){
             SingleAttributePredicate expandPredicate = list.get(oneLess.size());
             sp = onePredicateCache.get(oneLess).deepClone();
+            sp.intersect(get(expandPredicate));
+        } else if (lruCache.containsKey(oneLess)){
+            SingleAttributePredicate expandPredicate = list.get(oneLess.size());
+            sp = lruCache.get(oneLess).deepClone();
             sp.intersect(get(expandPredicate));
         }else {
             sp=new SortedPartition(data);

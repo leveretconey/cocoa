@@ -7,29 +7,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import leveretconey.dependencyDiscover.Data.DataFrame;
+import leveretconey.dependencyDiscover.Predicate.Operator;
+import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
+import leveretconey.util.Gateway;
 import leveretconey.util.Timer;
 import leveretconey.util.Util;
+
 
 public class FasTOD {
 
 
-    private long computeODTime=0;
-    private long pruneLevelTime=0;
-    private long calculateNextLevelTime=0;
-
+    private final long timeLimit;
     private boolean complete=true;
-    private Timer beginTimer;
 
-    private long timeLimit=5*60*60*1000;
     //M
-    private Set<CanonicalOD> result;
+    private List<CanonicalOD> result;
     //L
     private List<Set<AttributeSet>> contextInEachLevel;
     //cc
-    private HashMap<AttributeSet, AttributeSet> cc;
+    private HashMap<AttributeSet,AttributeSet> cc;
     //cs
     private HashMap<AttributeSet, Set<AttributePair>> cs;
     //l
@@ -39,30 +37,37 @@ public class FasTOD {
 
     private DataFrame data;
 
-    private boolean output;
-
     private double errorRateThreshold=-1f;
 
-    public FasTOD(long timeLimit, boolean output, double errorRateThreshold) {
-        this.timeLimit = timeLimit;
-        this.output = output;
-        this.errorRateThreshold = errorRateThreshold;
-    }
 
-    public FasTOD(long timeLimit, boolean output) {
-        this.timeLimit = timeLimit;
-        this.output = output;
-    }
+    Gateway traversalGateway;
 
-    void out(Object s){
-        if (output){
-            Util.out(s);
+    //statistics
+    int odcount=0,fdcount=0,ocdcount=0;
+
+    Timer timer;
+    void printStatistics(){
+        if (traversalGateway.isOpen()){
+            Util.out(String.format("当前时间%.3f秒，发现od%d个，其中fd%d个，ocd%d个,最后一个od是%s"
+            ,timer.getTimeUsedInSecond(),fdcount+ocdcount,fdcount,ocdcount,result.size()>0?result.get(result.size()-1):""));
         }
     }
 
+    public FasTOD(long timeLimit, double errorRateThreshold) {
+        this.timeLimit = timeLimit;
+        this.errorRateThreshold = errorRateThreshold;
+    }
+
+    public FasTOD(long timeLimit) {
+        this.timeLimit = timeLimit;
+    }
+
+
+
+
 
     private boolean timeUp(){
-        return beginTimer.getTimeUsed()>=timeLimit;
+        return timer.getTimeUsed()>=timeLimit;
     }
 
     private void ccPut(AttributeSet key, AttributeSet attributeSet){
@@ -71,13 +76,13 @@ public class FasTOD {
         cc.put(key,attributeSet);
     }
 
-    private void ccUnion(AttributeSet key, AttributeSet attributeSet){
+    private void ccUnion(AttributeSet key,AttributeSet attributeSet){
         if(!cc.containsKey(key))
             cc.put(key,new AttributeSet());
         cc.put(key,cc.get(key).union(attributeSet));
     }
 
-    private void ccPut(AttributeSet key, int attribute){
+    private void ccPut(AttributeSet key,int attribute){
         if(!cc.containsKey(key))
             cc.put(key,new AttributeSet());
         cc.put(key,cc.get(key).addAttribute(attribute));
@@ -87,7 +92,7 @@ public class FasTOD {
             cc.put(key,new AttributeSet());
         return cc.get(key);
     }
-    private void csPut(AttributeSet key, AttributePair value){
+    private void csPut(AttributeSet key,AttributePair value){
         if(!cs.containsKey(key))
             cs.put(key,new HashSet<>());
         cs.get(key).add(value);
@@ -104,9 +109,10 @@ public class FasTOD {
     }
 
     private void initialize(DataFrame data){
-        beginTimer=new Timer();
+        traversalGateway = new Gateway.ComplexTimeGateway();
+        timer = new Timer();
         this.data=data;
-        result=new TreeSet<>();
+        result=new ArrayList<>();
         cc=new HashMap<>();
         cs=new HashMap<>();
         contextInEachLevel=new ArrayList<>();
@@ -132,62 +138,38 @@ public class FasTOD {
         contextInEachLevel.add(level1Candidates);
     }
 
-    public Set<CanonicalOD> discover(DataFrame data){
+    public List<CanonicalOD> discover(DataFrame data){
 
-        Timer timer=new Timer();
         initialize(data);
         while (contextInEachLevel.get(level).size()!=0){
-            out(String.format("--------------------------\n第%d层开始\n--------------------------",level));
+            Util.out(String.format("第%d层开始",level));
             computeODs();
-            if (timeUp()){
-                break;
-            }
+                                if (timeUp()){
+                                    break;
+                                }
             pruneLevels();
             calculateNextLevel();
-            if (timeUp()){
-                break;
-            }
+                                    if (timeUp()){
+                                        break;
+                                    }
             level++;
         }
-        int fdCount=0,ocdCount=0;
-        for (int i = 0; i < 10; i++) {
-            out("");
-        }
-        for (CanonicalOD od : result) {
-            out(od);
-            if(od.left==-1)
-                fdCount++;
-            else
-                ocdCount++;
-        }
-        out("最终统计");
-        if(isComplete()){
-            out("正常终止");
+        if (isComplete()){
+            Util.out("FastOD算法正常结束");
         }else {
-            out("到达时间上限终止");
+            Util.out("FastOD算法结束,运行超时");
         }
-        out("共发现"+result.size()+"个od");
-        out("其中有"+fdCount+"个fd");
-        out("其中有"+ocdCount+"个ocd");
-        out("split检查次数"+ CanonicalOD.splitCheckCount);
-        out("swap检查次数"+ CanonicalOD.splitCheckCount);
-        out("product用时"+ StrippedPartition.mergeTime/1000.0+"s");
-        out("check用时"+ StrippedPartition.validateTime/1000.0+"s");
-        out("clone用时"+ StrippedPartition.cloneTime/1000.0+"s");
-        out("computeOD用时"+computeODTime/1000.0+"s");
-        out("pruneLevel用时"+pruneLevelTime/1000.0+"s");
-        out("calculateNextLevel用时"+calculateNextLevelTime/1000.0+"s");
-        out("共用时"+timer.getTimeUsed()/1000.0+"s");
+        Util.out(String.format("当前时间%.3f秒，发现od%d个，其中fd%d个，ocd%d个"
+                ,timer.getTimeUsedInSecond(),fdcount+ocdcount,fdcount,ocdcount));
         return result;
     }
     private void computeODs(){
-        Timer timer=new Timer();
         Set<AttributeSet> contextThisLevel=contextInEachLevel.get(level);
         for(AttributeSet context : contextThisLevel){
-            if(timeUp()){
-                complete=false;
-                return;
-            }
+                                    if(timeUp()){
+                                        complete=false;
+                                        return;
+                                    }
             AttributeSet contextCC=schema;
             for(int attribute : context){
                 contextCC=contextCC.intersect(ccGet(context.deleteAttribute(attribute)));
@@ -198,7 +180,11 @@ public class FasTOD {
                      for (int j = 0; j < data.getColumnCount(); j++) {
                          if(i==j)
                              continue;
-                         csPut(new AttributeSet(Arrays.asList(i,j)),new AttributePair(i,j));
+                         AttributeSet c=new AttributeSet(Arrays.asList(i,j));
+                         csPut(c, new AttributePair(SingleAttributePredicate.getInstance
+                                 (i, Operator.greaterEqual),j));
+                         csPut(c, new AttributePair(SingleAttributePredicate.getInstance
+                                 (i, Operator.lessEqual),j));
                      }
                  }
             }else if(level>2){
@@ -208,8 +194,8 @@ public class FasTOD {
                 }
                 for(AttributePair attributePair : candidateCsPairSet ){
                     AttributeSet contextDeleteAB=context
-                            .deleteAttribute(attributePair.attribute1)
-                            .deleteAttribute(attributePair.attribute2);
+                            .deleteAttribute(attributePair.left.attribute)
+                            .deleteAttribute(attributePair.right);
                     boolean addContext=true;
                     for(int attribute : contextDeleteAB){
                         if(!csGet(context.deleteAttribute(attribute)).contains(attributePair)){
@@ -235,29 +221,31 @@ public class FasTOD {
                         new CanonicalOD(context.deleteAttribute(attribute),attribute);
                 if(od.isValid(data,errorRateThreshold)){
                     result.add(od);
-                    out("发现od: "+od);
+                    fdcount++;
                     ccPut(context,ccGet(context).deleteAttribute(attribute));
                     for(int i :  schema.difference(context)){
                         ccPut(context,ccGet(context).deleteAttribute(i));
                     }
+                    printStatistics();
                 }
             }
             List<AttributePair> attributePairsToRemove=new ArrayList<>();
             for (AttributePair attributePair:csGet(context)){
-                int a=attributePair.attribute1;
-                int b=attributePair.attribute2;
+                int a=attributePair.left.attribute;
+                int b=attributePair.right;
                 if(!ccGet(context.deleteAttribute(b)).containAttribute(a)
                 || !ccGet(context.deleteAttribute(a)).containAttribute(b)){
                     attributePairsToRemove.add(attributePair);
                 }else {
                     CanonicalOD od =
-                            new CanonicalOD(context.deleteAttribute(a).deleteAttribute(b), a, b);
+                            new CanonicalOD(context.deleteAttribute(a).deleteAttribute(b),
+                                    attributePair.left, b);
                     if (od.isValid(data,errorRateThreshold)) {
-                        out("发现od: " + od);
+                        ocdcount++;
                         result.add(od);
                         attributePairsToRemove.add(attributePair);
-
                     }
+                    printStatistics();
                 }
 
             }
@@ -265,10 +253,8 @@ public class FasTOD {
                 csGet(context).remove(attributePair);
             }
         }
-        computeODTime+=timer.getTimeUsed();
     }
     private void pruneLevels(){
-        Timer timer=new Timer();
         if (level>=2){
             List<AttributeSet> nodesToRemove=new ArrayList<>();
             for (AttributeSet attributeSet : contextInEachLevel.get(level)) {
@@ -279,14 +265,11 @@ public class FasTOD {
             }
             Set<AttributeSet> contexts=contextInEachLevel.get(level);
             for (AttributeSet attributeSet : nodesToRemove) {
-                out("节点优化: "+attributeSet );
                 contexts.remove(attributeSet);
             }
         }
-        pruneLevelTime+=timer.getTimeUsed();
     }
     private void calculateNextLevel(){
-        Timer timer=new Timer();
         Map<AttributeSet,List<Integer>> prefixBlocks=new HashMap<>();
         Set<AttributeSet> contextNextLevel=new HashSet<>();
         Set<AttributeSet> contextThisLevel=contextInEachLevel.get(level);
@@ -302,10 +285,10 @@ public class FasTOD {
         }
 
         for (Map.Entry<AttributeSet, List<Integer>> attributeSetListEntry : prefixBlocks.entrySet()) {
-            if(timeUp()){
-                complete=false;
-                return;
-            }
+                        if(timeUp()){
+                            complete=false;
+                            return;
+                        }
             AttributeSet prefix=attributeSetListEntry.getKey();
             List<Integer> singleAttributes=attributeSetListEntry.getValue();
             if(singleAttributes.size()<=1)
@@ -315,7 +298,7 @@ public class FasTOD {
                     boolean createContext=true;
                     AttributeSet candidate=prefix.addAttribute(singleAttributes.get(i))
                             .addAttribute(singleAttributes.get(j));
-                    for (Integer attribute : candidate) {
+                    for (int attribute : candidate) {
                         if(!contextThisLevel.contains(candidate.deleteAttribute(attribute))){
                             createContext=false;
                             break;
@@ -328,7 +311,6 @@ public class FasTOD {
             }
         }
         contextInEachLevel.add(contextNextLevel);
-        calculateNextLevelTime+=timer.getTimeUsed();
     }
 
 }

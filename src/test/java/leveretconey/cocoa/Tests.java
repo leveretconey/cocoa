@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -19,6 +20,7 @@ import leveretconey.cocoa.twoSideExpand.DFSDiscovererG1;
 import leveretconey.cocoa.twoSideExpand.DFSDiscovererG3;
 import leveretconey.cocoa.twoSideExpand.RandomSampleEstimatingALODValidator;
 import leveretconey.dependencyDiscover.MinimalityChecker.ALODMinimalityCheckerUseFD;
+import leveretconey.dependencyDiscover.Predicate.Operator;
 import leveretconey.dependencyDiscover.SortedPartition.ImprovedTwoSideSortedPartition;
 import leveretconey.dependencyDiscover.SortedPartition.SortedPartition;
 import leveretconey.dependencyDiscover.MinimalityChecker.ALODMinimalityChecker;
@@ -32,7 +34,10 @@ import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicate;
 import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicateList;
 import leveretconey.dependencyDiscover.Validator.ALODValidator;
 import leveretconey.dependencyDiscover.Validator.Result.ValidationResultWithAccurateBound;
+import leveretconey.fastod.CanonicalOD;
+import leveretconey.fastod.FasTOD;
 import leveretconey.fastod.StrippedPartition;
+import leveretconey.orderap.ORDERAP;
 import leveretconey.util.Gateway;
 import leveretconey.util.Statistics;
 import leveretconey.util.TimeStatistics;
@@ -50,7 +55,7 @@ public class Tests {
     public static final boolean useData=true;
     public static final boolean useRawData=false;
     public static final boolean useDependency=false;
-    public static final boolean forgeData=false;
+    public static final boolean forgeData=true;
     public static final int logLevel= Gateway.LogGateway.DEBUG;
     public static final boolean hasTimeLimit=false;
     private static final StringBuilder debugInfo=new StringBuilder();
@@ -82,9 +87,9 @@ public class Tests {
             if (useRawData){
                 prePareDataSetFromRawData();
             }else if (forgeData){
-                data=DataFrame.randomDataFrame(100,2,1,10
+                data=DataFrame.randomDataFrame(100,5,1,2
                         ,(tuple,column,randomResult)->{
-                            return randomResult;
+                            return column%2==0?tuple+randomResult:-tuple+randomResult;
                         });
             }else {
                 data=DataFrame.fromCsv(DATA_PATH);
@@ -282,7 +287,6 @@ public class Tests {
      * g13 134     873     31573   33268
      * g13 0.01+0.05: 24213
      */
-    @Test
     void trySingleData(){
         ValidatorType[][] validators=new ValidatorType[][]{
                 {ValidatorType.G1},
@@ -306,6 +310,22 @@ public class Tests {
             ALODDiscoverer discoverer=new DFSDiscovererWithMultipleStandard(validators[i],errorRates[i]);
             discover(discoverer, data, new File(DATA_PATH).getName());
         }
+
+    }
+
+    void testOrder(){
+        ALODDiscoverer discoverer=new DFSDiscovererWithMultipleStandard(ValidatorType.G1,0.02);
+        Collection<LexicographicalOrderDependency> result = discoverer.discover(data, 0.02);
+        for (LexicographicalOrderDependency od : result) {
+            Util.out(od);
+        }
+
+        discoverer=new ORDERAP();
+        result = discoverer.discover(data, 0.02);
+        for (LexicographicalOrderDependency od : result) {
+            Util.out(od);
+        }
+
 
     }
 
@@ -496,7 +516,16 @@ public class Tests {
     }
 
 
-    void testApproximateFastOD(){
+    @Test
+    void testFastOD(){
+        FasTOD fasTOD=new FasTOD(10*60*60*1000,0.01);
+        List<CanonicalOD> ods = fasTOD.discover(data);
+        for (CanonicalOD od : ods) {
+            Util.out(od);
+        }
+    }
+
+    void testFastODER(){
         for (int i = 0; i < data.getColumnCount(); i++) {
             for (int j = i+1; j < data.getColumnCount(); j++) {
                 LexicographicalOrderDependency od=LexicographicalOrderDependency
@@ -505,7 +534,8 @@ public class Tests {
                 Util.out(new ImprovedTwoSideSortedPartition(data,od).validateForALODWithG3());
 
                 StrippedPartition sp=new StrippedPartition(data);
-                double er=sp.swapRemoveCount(i,j)/(double)data.getTupleCount();
+                double er=sp.swapRemoveCount(SingleAttributePredicate.getInstance
+                        (i, Operator.lessEqual),j)/(double)data.getTupleCount();
                 Util.out(String.format("%.3f%%",er*100));
                 Util.out("");
             }
