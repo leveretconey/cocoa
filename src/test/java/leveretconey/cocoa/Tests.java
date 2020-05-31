@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import leveretconey.cocoa.multipleStandard.DFSDiscovererMultiStdRankingFxTopK;
 import leveretconey.cocoa.ranking.LODRFClassSquareAttriCountAver;
 import leveretconey.cocoa.ranking.LODRFClassSquareSumOverAttriCount;
 import leveretconey.cocoa.multipleStandard.DFSDiscovererWithMultipleStandard;
@@ -519,6 +520,15 @@ public class Tests {
     }
 
     @Test
+    void testRankingTopk(){
+        ALODDiscoverer discoverer=new DFSDiscovererMultiStdRankingFxTopK
+                (ValidatorType.G1,0.02,20,new LODRFClassSquareAttriCountAver(data,0.18),4);
+        Collection<LexicographicalOrderDependency> ods = discoverer.discover(data, errorRateThreshold);
+        for (LexicographicalOrderDependency od : ods) {
+            Util.out(od);
+        }
+    }
+
     void testRankingFunction(){
         DFSDiscovererWithMultipleStandard discoverer = new DFSDiscovererWithMultipleStandard(ValidatorType.G1, 0.02);
         Collection<LexicographicalOrderDependency> ods = discoverer.discover(data, 0.02);
