@@ -13,10 +13,11 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import leveretconey.cocoa.multipleStandard.ClassSquareSumOverAttriCount;
+import leveretconey.cocoa.ranking.LODRFClassSquareAttriCountAver;
+import leveretconey.cocoa.ranking.LODRFClassSquareSumOverAttriCount;
 import leveretconey.cocoa.multipleStandard.DFSDiscovererWithMultipleStandard;
 import leveretconey.cocoa.multipleStandard.DFSDiscovererWithMultipleStandard.ValidatorType;
-import leveretconey.cocoa.multipleStandard.LODRankingFunction;
+import leveretconey.cocoa.ranking.LODRankingFunction;
 import leveretconey.cocoa.twoSideExpand.BruteForceALODValidatorUsingSP;
 import leveretconey.cocoa.twoSideExpand.DFSDiscovererG1;
 import leveretconey.cocoa.twoSideExpand.DFSDiscovererG3;
@@ -349,7 +350,7 @@ public class Tests {
         String odString="4<=,6<=->3<=,5<=";
         LexicographicalOrderDependency odPrototype=LexicographicalOrderDependency.fromString(odString);
         LexicographicalOrderDependency od=new LexicographicalOrderDependency();
-        LODRankingFunction rankingFunction=new ClassSquareSumOverAttriCount();
+        LODRankingFunction rankingFunction=new LODRFClassSquareSumOverAttriCount();
 
         od.right.add(odPrototype.right.get(0));
         od.left.add(odPrototype.left.get(0));
@@ -517,14 +518,22 @@ public class Tests {
         Statistics.printStstistics();
     }
 
+    @Test
     void testRankingFunction(){
         DFSDiscovererWithMultipleStandard discoverer = new DFSDiscovererWithMultipleStandard(ValidatorType.G1, 0.02);
         Collection<LexicographicalOrderDependency> ods = discoverer.discover(data, 0.02);
-        LODRankingFunction rankingFunction=new ClassSquareSumOverAttriCount();
+        LODRankingFunction[] rankingFunctions=new LODRankingFunction[11];
+        for (int i = 0; i < 11; i++) {
+            rankingFunctions[i]=new LODRFClassSquareAttriCountAver(data,0.1*i);
+        }
         for (LexicographicalOrderDependency od : ods) {
             ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition(data,od);
-            double ranking=rankingFunction.getRanking(od,isp);
-            Util.out(String.format("%s的ranking是%.4f",od,ranking));
+            StringBuilder sb=new StringBuilder();
+            sb.append(od);
+            for (LODRankingFunction rankingFunction : rankingFunctions) {
+                sb.append(String.format(";%.4f",rankingFunction.getRanking(od,isp)));
+            }
+            Util.out(sb.toString());
         }
     }
 

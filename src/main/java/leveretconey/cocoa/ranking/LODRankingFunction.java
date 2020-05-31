@@ -1,4 +1,4 @@
-package leveretconey.cocoa.multipleStandard;
+package leveretconey.cocoa.ranking;
 
 import leveretconey.dependencyDiscover.Dependency.LexicographicalOrderDependency;
 import leveretconey.dependencyDiscover.SortedPartition.ImprovedTwoSideSortedPartition;

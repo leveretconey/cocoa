@@ -1,11 +1,11 @@
-package leveretconey.cocoa.multipleStandard;
+package leveretconey.cocoa.ranking;
 
 import leveretconey.dependencyDiscover.Dependency.LexicographicalOrderDependency;
 import leveretconey.dependencyDiscover.Predicate.SingleAttributePredicateList;
 import leveretconey.dependencyDiscover.SortedPartition.ImprovedTwoSideSortedPartition;
 import leveretconey.dependencyDiscover.SortedPartition.SortedPartition;
 
-public class ClassSquareSumOverAttriCount implements LODRankingFunction {
+public class LODRFClassSquareSumOverAttriCount implements LODRankingFunction {
     @Override
     public double getRanking(LexicographicalOrderDependency od, ImprovedTwoSideSortedPartition sp) {
         return (getInterestingness(sp.left,od.left)+ getInterestingness(sp.right,od.right))/2;
