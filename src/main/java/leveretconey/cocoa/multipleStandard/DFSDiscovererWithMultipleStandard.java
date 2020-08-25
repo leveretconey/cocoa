@@ -75,7 +75,8 @@ public class DFSDiscovererWithMultipleStandard extends ALODDiscoverer {
     public Collection<LexicographicalOrderDependency> discover(DataFrame data, double errorRateThreshold) {
         this.data               = data;
         timer                   = new Timer();
-        int maxSpCache          = (int)(2.0*1024*1024*1024/4/3/data.getTupleCount());
+//        int maxSpCache          = (int)(2.0*1024*1024*1024/4/3/data.getTupleCount());
+        int maxSpCache          = 0;
         spCache                 = new TwoSideDFSSPCache(data,maxSpCache);
         minimalityChecker       = new ALODMinimalityCheckerUseFD();
         traversalGateway        = new ComplexTimeGateway();
@@ -110,6 +111,8 @@ public class DFSDiscovererWithMultipleStandard extends ALODDiscoverer {
         ispCache.updateWorkingNode(parent);
         List<SingleAttributePredicate> expandPredicates = parent.toLOD()
                 .getExpandPredicates(data, minimalityChecker, parent.isExpandLeft());
+//        List<SingleAttributePredicate> expandPredicates = parent.toLOD()
+//                .getExpandPredicates(data);
         SortedPartition parentSp=spCache.get(parent.sideToExpand());
         SingleAttributePredicateList parentSideToExpand = parent.sideToExpand();
         for(int i=expandPredicates.size()-1;i>=0;i--){

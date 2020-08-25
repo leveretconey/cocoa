@@ -52,7 +52,7 @@ import leveretconey.util.Util;
 @SpringBootTest
 public class Tests {
 
-    public static final String DATA_PATH ="data/debugData/ncvoter 5000行 14列 616.814 2200个od.csv";
+    public static final String DATA_PATH ="data/debugData/DBT_250k_1.csv";
     public static final String DIRECTORY_PATH ="data/experimentData";
     public static final String DATA_OUTPUT_PATH="";
     public static final String DEPENDENCY_STRING="1<=->2<=";
@@ -291,33 +291,43 @@ public class Tests {
      * g13 134     873     31573   33268
      * g13 0.01+0.05: 24213
      */
+
+    void testFlight(){
+        DataFrame data;
+        ALODDiscoverer discoverer;
+        Collection<LexicographicalOrderDependency> result;
+
+        data=DataFrame.fromCsv("data/debugData/flight_200k.csv");
+        discoverer=new DFSDiscovererWithMultipleStandard(ValidatorType.G3,0.03);
+        result=discoverer.discover(data,0.03);
+        printStatistics();
+        resetStatistics();
+
+        data=DataFrame.fromCsv("data/debugData/flight_250k_12.csv");
+        discoverer=new DFSDiscovererWithMultipleStandard(ValidatorType.G3,0.03);
+        result=discoverer.discover(data,0.03);
+        printStatistics();
+        resetStatistics();
+
+    }
+
     void trySingleData(){
         ValidatorType[][] validators=new ValidatorType[][]{
-                {ValidatorType.G1},
-//                {ValidatorType.G1},
-//                {ValidatorType.G1},
-//                {ValidatorType.G3},
-//                {ValidatorType.G3},
-//                {ValidatorType.G3},
-//                {ValidatorType.G1,ValidatorType.G3},
-//                {ValidatorType.G1,ValidatorType.G3},
+                {ValidatorType.G3},
         };
         double[][] errorRates=new double[][]{
-                {0.01},
-//                {0.02},
-//                {0.05},
-//                {0.01},
-//                {0.02},
-//                {0.05},
+                {0.03},
         } ;
         for (int i = 0; i < validators.length; i++) {
             ALODDiscoverer discoverer=new DFSDiscovererWithMultipleStandard(validators[i],errorRates[i]);
-            discover(discoverer, data, new File(DATA_PATH).getName());
+            Collection<LexicographicalOrderDependency> ods = discoverer.discover(data, 0.03);
+            for (LexicographicalOrderDependency od : ods) {
+                Util.out(od);
+            }
         }
 
     }
 
-    @Test
     void testOrder(){
         ALODDiscoverer discoverer=new DFSDiscovererWithMultipleStandard(ValidatorType.G1,0.02);
         Collection<LexicographicalOrderDependency> result;
@@ -519,7 +529,6 @@ public class Tests {
         Statistics.printStstistics();
     }
 
-    @Test
     void testRankingTopk(){
         ALODDiscoverer discoverer=new DFSDiscovererMultiStdRankingFxTopK
                 (ValidatorType.G1,0.02,20,new LODRFClassSquareAttriCountAver(data,0.18),4);
@@ -594,5 +603,36 @@ public class Tests {
         Assert.assertTrue(checker.isMinimal
                 (SingleAttributePredicateList.fromString("1<=,3>=")));
 
+    }
+
+    void testRecall(){
+        DataFrame[] datas={
+                DataFrame.fromCsv("data/debugData/flight_10k_0.01noise_1.csv"),
+        };
+        LexicographicalOrderDependency[] ods={
+                LexicographicalOrderDependency.fromString("1<=->2<="),
+                LexicographicalOrderDependency.fromString("3<=->4<="),
+                LexicographicalOrderDependency.fromString("5<=->6<="),
+                LexicographicalOrderDependency.fromString("10<=->7<=,8<=,9<="),
+                LexicographicalOrderDependency.fromString("11<=->12<="),
+        };
+
+        Util.out("g1:");
+        for (LexicographicalOrderDependency od : ods) {
+            for (DataFrame data : datas) {
+                ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition(data,od);
+                Util.out(String.format("%s : %s",od,isp.validateForALODWithG1()));
+            }
+            Util.out("");
+        }
+
+        Util.out("\n\ng3:");
+        for (LexicographicalOrderDependency od : ods) {
+            for (DataFrame data : datas) {
+                ImprovedTwoSideSortedPartition isp=new ImprovedTwoSideSortedPartition(data,od);
+                Util.out(String.format("%s : %s",od,isp.validateForALODWithG3()));
+            }
+            Util.out("");
+        }
     }
 }
